@@ -49,7 +49,16 @@ const MOCK_EXTRA = [
 ];
 function mockAccounts() {
   const base = overrides.map((c, i) => [c.id, c.name, [110, 300, 135][i % 3], [1.0, 1.12, 0.58][i % 3]]);
-  return [...base, ...MOCK_EXTRA].map(([id, name, daily, pace, flag]) => ({ id, name, daily, pace, flag }));
+  // MOCK_ACCOUNTS=200 fyller på med påhittade konton för att prova vyerna med många kunder.
+  const words = ['Bygg', 'Tandvård', 'Juridik', 'Bil', 'Hotell', 'El', 'VVS', 'Mäklare', 'Redovisning', 'Café', 'Frisör', 'Golf', 'Möbler', 'Städ', 'Trädgård', 'Optik'];
+  const towns = ['Malmö', 'Lund', 'Växjö', 'Borås', 'Umeå', 'Gävle', 'Kalmar', 'Örebro', 'Luleå', 'Visby', 'Falun', 'Ystad'];
+  const extra = Array.from({ length: Number(process.env.MOCK_ACCOUNTS || 0) }, (_, i) => [
+    String(8000000000 + i * 7919),
+    `Testkund ${words[i % words.length]} ${towns[(i * 7) % towns.length]}${i >= words.length * towns.length ? ' ' + i : ''}`,
+    [60, 90, 120, 180, 250, 400][(i * 5) % 6],
+    [0.55, 0.8, 0.93, 0.97, 1.0, 1.02, 1.04, 1.1, 1.25][(i * 7) % 9],
+  ]);
+  return [...base, ...MOCK_EXTRA, ...extra].map(([id, name, daily, pace, flag]) => ({ id, name, daily, pace, flag }));
 }
 function mockData(acc) {
   if (acc.flag === 'error') throw new Error('USER_PERMISSION_DENIED (testdata)');

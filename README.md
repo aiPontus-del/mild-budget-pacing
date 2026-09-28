@@ -17,7 +17,7 @@ npm install
 npm run dev          # mockläge, http://localhost:3000
 ```
 
-Servern kör i mockläge tills alla fem `GOOGLE_ADS_*`-variabler finns. Dashboarden visar då "Testdata från servern".
+Servern kör i mockläge tills alla fem `GOOGLE_ADS_*`-variabler finns. Dashboarden visar då "Testdata från servern". Sätt `MOCK_ACCOUNTS=150` för att prova vyerna med många påhittade kunder (gäller bara mockläge).
 
 ## Koppla på Google Ads
 
