@@ -1,7 +1,5 @@
 # Mild Budget Pacing
 
-> Driftsättning på egen server: se [DRIFT.md](DRIFT.md).
-
 Budget pacing för Milds Google Ads-konton, direkt mot Google Ads API. Ingen Supermetrics.
 
 - `public/index.html` – dashboarden (en fil, inga byggsteg)
@@ -10,22 +8,25 @@ Budget pacing för Milds Google Ads-konton, direkt mot Google Ads API. Ingen Sup
 - `clients.json` – valfria namn och standardbudgetar per konto-ID (kontolistan hämtas från MCC:n)
 - `alerts.js` – larmregler för notiscentret
 - `store.js` – lagring av budgetar, dolda konton och larm (fil eller Redis)
-- `render.yaml` – färdig uppsättning för Render (testmiljö)
-- `Dockerfile`, `docker-compose.yml`, `deploy/` – drift på egen server, se DRIFT.md
 - `.env.example` – alla miljövariabler med förklaringar
 
-## Köra lokalt
+## Köra
+
+Kräver Node.js 20 eller senare.
 
 ```bash
 npm install
-npm run dev          # mockläge, http://localhost:3000
+npm start            # http://localhost:3000 (PORT, HOST och övrigt i .env.example)
+npm run dev          # utvecklingsläge med testdata
 ```
+
+Appen ska köras i en instans. Tillståndet ligger i `DATA_DIR/state.json` och ska vara beständigt. `/healthz` svarar alltid utan inloggning och visar läge (`mock` eller `live`).
 
 Servern kör i mockläge tills alla fem `GOOGLE_ADS_*`-variabler finns. Dashboarden visar då "Testdata från servern". Sätt `MOCK_ACCOUNTS=150` för att prova vyerna med många påhittade kunder (gäller bara mockläge).
 
 ## Koppla på Google Ads
 
-Sätt dessa miljövariabler (på Render under Environment, aldrig i koden):
+Sätt dessa miljövariabler (aldrig i koden):
 
 | Variabel | Var den kommer ifrån |
 |---|---|
@@ -46,18 +47,12 @@ Aktivera också **Google Ads API** i samma Cloud-projekt.
 
 Viktigt: står OAuth-samtyckesskärmen i läget **Testing** slutar refresh token att fungera efter 7 dagar. Sätt den till **In production**. Appen behöver inte verifieras för eget bruk.
 
-## Driftsätta på Render
-
-1. Lägg koden i ett GitHub-repo.
-2. Render → New → Blueprint → välj repot. `render.yaml` sätter upp tjänst, disk och variabler.
-3. Fyll i hemliga variabler, inklusive `DASHBOARD_PASSWORD`.
-
-### Var månadsbudgetarna sparas
+## Var månadsbudgetarna sparas
 
 Ändrade månadsbudgetar (per månad), dolda konton och larm sparas tillsammans.
 
-- **Med `REDIS_URL` satt** (rekommenderas): i Redis, t.ex. Upstash gratisnivå. Överlever omstarter och fungerar på Renders gratisplan. Nyckeln är `mild-budget-pacing:state` (ändras med `REDIS_KEY`).
-- **Utan `REDIS_URL`**: i `DATA_DIR/state.json`. På Renders gratisplan nollställs filen varje gång tjänsten startar om eller somnar, så då behövs Starter-plan med disk.
+- Som standard i `DATA_DIR/state.json`.
+- Med `REDIS_URL` satt i Redis i stället (används i testmiljön på Render, där disken inte är beständig).
 
 `/healthz` visar vilken lagring som används (`store`). Standardbudgetar i `clients.json` gäller alltid som reserv.
 
