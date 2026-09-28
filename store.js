@@ -61,4 +61,5 @@ module.exports = {
   save,
   get: () => state,
   kind: redis ? 'redis' : 'file',
+  flush: () => writing.catch(() => {}),
 };

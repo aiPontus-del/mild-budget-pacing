@@ -236,14 +236,28 @@ app.get('/api/alerts', (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+const HOST = process.env.HOST || '0.0.0.0';
+
 store.load()
   .catch((err) => console.error('Kunde inte läsa sparat tillstånd, startar tomt:', err.message))
   .finally(() => {
-    app.listen(PORT, () => {
-      console.log(`Budget pacing kör på http://localhost:${PORT} (${MOCK ? 'mockläge' : 'Google Ads ' + googleAds.API_VERSION}, lagring: ${store.kind})`);
+    const server = app.listen(PORT, HOST, () => {
+      console.log(`Budget pacing kör på http://${HOST}:${PORT} (${MOCK ? 'mockläge' : 'Google Ads ' + googleAds.API_VERSION}, lagring: ${store.kind})`);
     });
     // Bakgrundskontroll så att larm uppdateras även när ingen har sidan öppen.
     const tick = () => getPayload(true).catch((e) => console.error('Bakgrundskontroll misslyckades:', e.message));
     setTimeout(tick, 5000);
-    setInterval(tick, REFRESH_MS);
+    const timer = setInterval(tick, REFRESH_MS);
+
+    // Avsluta snyggt vid omstart (systemd, Docker): vänta in pågående skrivningar.
+    const shutdown = (signal) => {
+      console.log(`${signal} mottagen, stänger ned`);
+      clearInterval(timer);
+      server.close(() => {
+        store.flush().finally(() => process.exit(0));
+      });
+      setTimeout(() => process.exit(0), 5000).unref();
+    };
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
   });

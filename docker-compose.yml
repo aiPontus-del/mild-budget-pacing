@@ -1,0 +1,17 @@
+services:
+  mild-budget-pacing:
+    build: .
+    container_name: mild-budget-pacing
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      DATA_DIR: /data
+    # Bara lokalt på servern; nginx (eller annan proxy) terminerar HTTPS framför.
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - pacing-data:/data
+
+volumes:
+  pacing-data:

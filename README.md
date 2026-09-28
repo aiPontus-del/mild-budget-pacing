@@ -1,5 +1,7 @@
 # Mild Budget Pacing
 
+> Driftsättning på egen server: se [DRIFT.md](DRIFT.md).
+
 Budget pacing för Milds Google Ads-konton, direkt mot Google Ads API. Ingen Supermetrics.
 
 - `public/index.html` – dashboarden (en fil, inga byggsteg)
@@ -8,7 +10,9 @@ Budget pacing för Milds Google Ads-konton, direkt mot Google Ads API. Ingen Sup
 - `clients.json` – valfria namn och standardbudgetar per konto-ID (kontolistan hämtas från MCC:n)
 - `alerts.js` – larmregler för notiscentret
 - `store.js` – lagring av budgetar, dolda konton och larm (fil eller Redis)
-- `render.yaml` – färdig uppsättning för Render
+- `render.yaml` – färdig uppsättning för Render (testmiljö)
+- `Dockerfile`, `docker-compose.yml`, `deploy/` – drift på egen server, se DRIFT.md
+- `.env.example` – alla miljövariabler med förklaringar
 
 ## Köra lokalt
 
