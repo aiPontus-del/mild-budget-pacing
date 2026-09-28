@@ -23,7 +23,7 @@ Sätt upp Mild Budget Pacing på Milds server så att den nås på en egen adres
 ## Det här får du
 
 - Den här zip-filen med koden. Kräver Node.js 20 eller senare: `npm install` och `npm start`. Alla inställningar finns med förklaring i `.env.example`.
-- Inloggningsuppgifterna till Google Ads API från Pontus, separat: developer token, OAuth client ID, OAuth client secret, refresh token och MCC:ns kund-ID. De motsvarar variablerna `GOOGLE_ADS_*` i `.env.example`.
+- Inloggningsuppgifterna till Google Ads API tar du fram själv: developer token (API Center i MCC:n, kräver administratörsbehörighet), OAuth client ID och secret (Google Cloud-projekt med Google Ads API aktiverat), refresh token och MCC:ns kund-ID. Använd Milds befintliga developer token om det redan finns en. Skapa refresh token med ett konto som bara har läsbehörighet i MCC:n. Stegen står i README, och värdena motsvarar `GOOGLE_ADS_*` i `.env.example`.
 - Utan Google-uppgifterna kör appen med testdata, så den kan sättas upp innan de finns.
 
 ## Klart när
