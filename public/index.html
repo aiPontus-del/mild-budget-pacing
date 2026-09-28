@@ -356,6 +356,46 @@
   }
   .toast.show { opacity: 1; transform: none; }
 
+  /* Visningsläge */
+  .seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 7px; overflow: hidden; }
+  .seg button {
+    height: 28px; padding: 0 11px;
+    border: 0; background: var(--surface);
+    font-size: 12px; font-weight: 600; color: var(--ink-2);
+    cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--line-2); }
+  .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+  .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  /* Kompakt läge */
+  .table-wrap.scroll { max-height: calc(100vh - 150px); overflow: auto; }
+  .table-wrap.scroll thead th { position: sticky; top: 0; z-index: 2; }
+  .table-wrap.scroll tfoot td { position: sticky; bottom: 0; z-index: 2; }
+  table.compact td { padding: 5px 10px; font-size: 12.5px; }
+  table.compact tbody tr.acct { cursor: pointer; }
+  table.compact tbody tr.acct > td:first-child { border-left-width: 4px; }
+  table.compact .acct-cell { min-width: 0; gap: 8px; }
+  table.compact .row-toggle { width: 20px; height: 20px; font-size: 9px; }
+  table.compact .acct-name {
+    display: inline-block; max-width: 280px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;
+  }
+  table.compact .row-tags { display: inline-flex; margin: 0 0 0 6px; vertical-align: middle; }
+  table.compact .bar { height: 6px; min-width: 120px; }
+  table.compact .bar-now { top: -3px; bottom: -3px; }
+  table.compact .pill { padding: 1px 8px; font-size: 11px; }
+  table.compact .flag-err { color: var(--over); font-size: 11px; font-weight: 600; margin-left: 6px; }
+  .compact-detail {
+    display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 28px;
+    padding: 10px 14px 4px 46px;
+  }
+  .fact { display: grid; gap: 2px; }
+  .fact-label { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+  .fact-value { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .compact-detail .budget-box { justify-items: start; }
+  table.compact tr.detail .camp-wrap { padding-left: 46px; }
+
   /* Notiser och kontohantering */
   .btn-bell { position: relative; display: inline-flex; align-items: center; gap: 6px; }
   .btn-bell .bell-count {
@@ -534,23 +574,16 @@
           <option value="name">Namn A–Ö</option>
           <option value="spend">Mest spend först</option>
         </select>
+        <div class="seg" role="group" aria-label="Visningsläge">
+          <button type="button" data-density="detailed" aria-pressed="true">Detaljerad</button>
+          <button type="button" data-density="compact" aria-pressed="false">Kompakt</button>
+        </div>
         <button class="btn" id="manageBtn" type="button" aria-haspopup="dialog">Hantera konton</button>
       </div>
     </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Kund / konto</th>
-            <th class="r">Aktiv dagsbudget</th>
-            <th class="r">Månadsbudget</th>
-            <th class="r">Spend hittills</th>
-            <th class="r">Prognos</th>
-            <th>Förbrukat mot tid</th>
-            <th>Status</th>
-            <th class="r">Behövd dagsspend</th>
-          </tr>
-        </thead>
+    <div class="table-wrap" id="tableWrap">
+      <table id="table">
+        <thead id="thead"></thead>
         <tbody id="tbody">
           <tr><td colspan="8" class="empty">Hämtar kontodata…</td></tr>
         </tbody>
@@ -606,6 +639,7 @@
     filter: 'all',
     search: '',
     sort: 'status',
+    density: (() => { try { return localStorage.getItem('pacing-density') === 'compact' ? 'compact' : 'detailed'; } catch { return 'detailed'; } })(),
     showDormant: false,
     open: new Set(),
     alerts: { active: [], history: [], minDay: 4 },
@@ -950,54 +984,39 @@
       return Math.abs(b.dev ?? -1) - Math.abs(a.dev ?? -1);
     });
 
-    const tbody = $('tbody');
-    if (!list.length) {
-      tbody.innerHTML = `<tr><td colspan="8" class="empty">${state.error ? 'Ingen kontodata att visa.' : rows.length ? 'Inga konton matchar filtret.' : 'Inga konton att visa. Öppna Hantera konton för att visa dolda konton.'}</td></tr>`;
-    } else {
-      tbody.innerHTML = list.map((r) => {
-        const open = state.open.has(r.id);
-        const cur = r.currency || 'SEK';
-        const needDelta = r.need != null && r.currentRate > 0 ? ((r.need - r.currentRate) / r.currentRate) * 100 : null;
-        const main = `
-          <tr class="acct s-${r.status}">
-            <td>
-              <div class="acct-cell">
-                <button class="row-toggle" type="button" data-toggle="${esc(r.id)}" aria-expanded="${open}" aria-label="Visa kampanjer för ${esc(r.name)}">▶</button>
-                <div>
-                  <span class="acct-name">${esc(r.name)}</span>
-                  <span class="acct-id">${fmtId(r.id)}</span>
-                  ${r.error ? `<span class="acct-err">${esc(r.error)}</span>` : ''}
-                  ${(alertsByAcct.get(r.id) || []).filter((x) => x.type === 'stopped' || x.type === 'exhausted').length
-                    ? `<span class="row-tags">${alertsByAcct.get(r.id).filter((x) => x.type === 'stopped' || x.type === 'exhausted').map((x) => `<span class="row-tag ${x.severity}">${esc(x.title)}</span>`).join('')}</span>` : ''}
-                </div>
-              </div>
-            </td>
-            <td class="r num">${fmtMoney(r.dailyBudget, cur)}</td>
-            <td class="r">
-              <div class="budget-box">
-                <label class="budget-field">
-                  <input class="budget-input ${r.source === 'manual' ? 'manual' : ''}" id="budget-${esc(r.id)}" type="number" min="0" step="100"
-                    inputmode="numeric" data-budget="${esc(r.id)}" value="${Math.round(r.budget || 0)}" aria-label="Månadsbudget för ${esc(r.name)}">
-                  <span class="budget-suffix">${esc(cur)}</span>
-                </label>
-                ${r.source === 'manual'
-                  ? `<button class="linkbtn" type="button" data-reset="${esc(r.id)}">Ändrad i ${MONTHS[m.month - 1]} · återställ</button>`
-                  : r.source === 'default'
-                    ? `<span class="budget-hint">Standardbudget</span>`
-                    : `<span class="budget-hint">Auto: dagsbudget × 30,4</span>`}
-              </div>
-            </td>
-            <td class="r num">${fmtMoney(r.mtdCost, cur)}</td>
-            <td class="r num">${fmtMoney(r.forecast, cur)}</td>
-            <td class="pace">${barHtml(r, elapsedPct, COLOR[r.status])}</td>
-            <td><span class="pill ${r.status}">${statusLabel(r)}${r.dev != null ? ` <span class="pill-num">${fmtPct(r.dev, true)}</span>` : ''}</span></td>
-            <td class="r"><span class="need">${r.need != null ? fmtMoney(r.need, cur) + '/dag' : '–'}</span>
-              <span class="need-sub">${r.need === 0 && r.budget > 0 ? 'budgeten är nådd' : needDelta == null ? '' : Math.abs(needDelta) < 5 ? 'samma som nu' : (needDelta > 0 ? 'höj ' : 'sänk ') + fmtPct(needDelta) + ' mot nu'}</span></td>
-          </tr>`;
-        if (!open) return main;
-        const camps = (r.campaigns || []).slice().sort((x, y) => (y.cost || 0) - (x.cost || 0));
-        const detail = `
-          <tr class="detail"><td colspan="8">
+    const compact = state.density === 'compact';
+    const cols = compact ? 6 : 8;
+    $('table').classList.toggle('compact', compact);
+    $('tableWrap').classList.toggle('scroll', compact);
+    document.querySelectorAll('[data-density]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.density === state.density)));
+    $('thead').innerHTML = compact
+      ? `<tr><th>Kund / konto</th><th class="r">Spend hittills</th><th class="r">Månadsbudget</th><th class="r">Prognos</th><th>Förbrukat mot tid</th><th>Avvikelse</th></tr>`
+      : `<tr><th>Kund / konto</th><th class="r">Aktiv dagsbudget</th><th class="r">Månadsbudget</th><th class="r">Spend hittills</th><th class="r">Prognos</th><th>Förbrukat mot tid</th><th>Status</th><th class="r">Behövd dagsspend</th></tr>`;
+
+    const budgetEditor = (r, cur) => `
+      <div class="budget-box">
+        <label class="budget-field">
+          <input class="budget-input ${r.source === 'manual' ? 'manual' : ''}" id="budget-${esc(r.id)}" type="number" min="0" step="100"
+            inputmode="numeric" data-budget="${esc(r.id)}" value="${Math.round(r.budget || 0)}" aria-label="Månadsbudget för ${esc(r.name)}">
+          <span class="budget-suffix">${esc(cur)}</span>
+        </label>
+        ${r.source === 'manual'
+          ? `<button class="linkbtn" type="button" data-reset="${esc(r.id)}">Ändrad i ${MONTHS[m.month - 1]} · återställ</button>`
+          : r.source === 'default'
+            ? `<span class="budget-hint">Standardbudget</span>`
+            : `<span class="budget-hint">Auto: dagsbudget × 30,4</span>`}
+      </div>`;
+    const needSub = (r) => {
+      const needDelta = r.need != null && r.currentRate > 0 ? ((r.need - r.currentRate) / r.currentRate) * 100 : null;
+      return r.need === 0 && r.budget > 0 ? 'budgeten är nådd' : needDelta == null ? '' : Math.abs(needDelta) < 5 ? 'samma som nu' : (needDelta > 0 ? 'höj ' : 'sänk ') + fmtPct(needDelta) + ' mot nu';
+    };
+    const tagsHtml = (r) => {
+      const t = (alertsByAcct.get(r.id) || []).filter((x) => x.type === 'stopped' || x.type === 'exhausted');
+      return t.length ? `<span class="row-tags">${t.map((x) => `<span class="row-tag ${x.severity}">${esc(x.title)}</span>`).join('')}</span>` : '';
+    };
+    const campsHtml = (r, cur) => {
+      const camps = (r.campaigns || []).slice().sort((x, y) => (y.cost || 0) - (x.cost || 0));
+      return `
             <div class="camp-wrap">
               ${camps.length ? `
               <table class="camp-table">
@@ -1013,13 +1032,91 @@
                     </tr>`).join('')}
                 </tbody>
               </table>` : '<p class="empty">Inga kampanjer med budget eller spend den här månaden.</p>'}
+            </div>`;
+    };
+    const compactRow = (r) => {
+      const open = state.open.has(r.id);
+      const cur = r.currency || 'SEK';
+      const main = `
+          <tr class="acct s-${r.status}" data-row="${esc(r.id)}" title="${esc(r.name)} · ${fmtId(r.id)}">
+            <td>
+              <div class="acct-cell">
+                <button class="row-toggle" type="button" data-toggle="${esc(r.id)}" aria-expanded="${open}" aria-label="Visa detaljer för ${esc(r.name)}">▶</button>
+                <span><span class="acct-name">${esc(r.name)}</span>${r.error ? '<span class="flag-err">Fel vid hämtning</span>' : ''}${tagsHtml(r)}</span>
+              </div>
+            </td>
+            <td class="r num">${fmtMoney(r.mtdCost, cur)}</td>
+            <td class="r num">${fmtMoney(r.budget, cur)}</td>
+            <td class="r num">${fmtMoney(r.forecast, cur)}</td>
+            <td class="pace">
+              <div class="bar" title="Förbrukat ${fmtPct(r.util)} av budget · prognos ${fmtPct(r.fcPct)}">
+                <div class="bar-fc" style="width:${Math.min(100, Math.max(0, r.fcPct ?? 0))}%;background:${COLOR[r.status]}"></div>
+                <div class="bar-fill" style="width:${Math.min(100, Math.max(0, r.util ?? 0))}%;background:${COLOR[r.status]}"></div>
+                <div class="bar-now" style="left:${Math.min(100, elapsedPct)}%"></div>
+              </div>
+            </td>
+            <td><span class="pill ${r.status}" title="${statusLabel(r)}">${r.dev != null ? `<span class="pill-num">${fmtPct(r.dev, true)}</span>` : statusLabel(r)}</span></td>
+          </tr>`;
+      if (!open) return main;
+      return main + `
+          <tr class="detail"><td colspan="6">
+            <div class="compact-detail">
+              <div class="fact"><span class="fact-label">Status</span><span class="pill ${r.status}">${statusLabel(r)}</span></div>
+              <div class="fact"><span class="fact-label">Konto-ID</span><span class="fact-value">${fmtId(r.id)}</span></div>
+              <div class="fact"><span class="fact-label">Aktiv dagsbudget</span><span class="fact-value">${fmtMoney(r.dailyBudget, cur)}</span></div>
+              <div class="fact"><span class="fact-label">Behövd dagsspend</span><span class="fact-value">${r.need != null ? fmtMoney(r.need, cur) + '/dag' : '–'}</span><span class="need-sub">${needSub(r)}</span></div>
+              <div class="fact"><span class="fact-label">Månadsbudget</span>${budgetEditor(r, cur)}</div>
+              ${r.error ? `<div class="fact"><span class="fact-label">Fel</span><span class="acct-err">${esc(r.error)}</span></div>` : ''}
             </div>
+            ${campsHtml(r, cur)}
           </td></tr>`;
+    };
+
+    const tbody = $('tbody');
+    if (!list.length) {
+      tbody.innerHTML = `<tr><td colspan="${cols}" class="empty">${state.error ? 'Ingen kontodata att visa.' : rows.length ? 'Inga konton matchar filtret.' : 'Inga konton att visa. Öppna Hantera konton för att visa dolda konton.'}</td></tr>`;
+    } else {
+      tbody.innerHTML = compact ? list.map(compactRow).join('') : list.map((r) => {
+        const open = state.open.has(r.id);
+        const cur = r.currency || 'SEK';
+        const main = `
+          <tr class="acct s-${r.status}">
+            <td>
+              <div class="acct-cell">
+                <button class="row-toggle" type="button" data-toggle="${esc(r.id)}" aria-expanded="${open}" aria-label="Visa kampanjer för ${esc(r.name)}">▶</button>
+                <div>
+                  <span class="acct-name">${esc(r.name)}</span>
+                  <span class="acct-id">${fmtId(r.id)}</span>
+                  ${r.error ? `<span class="acct-err">${esc(r.error)}</span>` : ''}
+                  ${tagsHtml(r)}
+                </div>
+              </div>
+            </td>
+            <td class="r num">${fmtMoney(r.dailyBudget, cur)}</td>
+            <td class="r">
+              ${budgetEditor(r, cur)}
+            </td>
+            <td class="r num">${fmtMoney(r.mtdCost, cur)}</td>
+            <td class="r num">${fmtMoney(r.forecast, cur)}</td>
+            <td class="pace">${barHtml(r, elapsedPct, COLOR[r.status])}</td>
+            <td><span class="pill ${r.status}">${statusLabel(r)}${r.dev != null ? ` <span class="pill-num">${fmtPct(r.dev, true)}</span>` : ''}</span></td>
+            <td class="r"><span class="need">${r.need != null ? fmtMoney(r.need, cur) + '/dag' : '–'}</span>
+              <span class="need-sub">${needSub(r)}</span></td>
+          </tr>`;
+        if (!open) return main;
+        const detail = `
+          <tr class="detail"><td colspan="8">${campsHtml(r, cur)}</td></tr>`;
         return main + detail;
       }).join('');
     }
 
-    $('tfoot').innerHTML = `
+    $('tfoot').innerHTML = compact ? `
+      <td>Totalt ${shown.length} konton</td>
+      <td class="r num">${fmtMoney(tot.mtd, cur)}</td>
+      <td class="r num">${fmtMoney(tot.budget, cur)}</td>
+      <td class="r num">${fmtMoney(tot.fc, cur)}</td>
+      <td class="pace"><div class="bar"><div class="bar-fc" style="width:${Math.min(100, Math.max(0, totRow.fcPct ?? 0))}%;background:var(--accent)"></div><div class="bar-fill" style="width:${Math.min(100, Math.max(0, totRow.util ?? 0))}%;background:var(--accent)"></div><div class="bar-now" style="left:${Math.min(100, elapsedPct)}%"></div></div></td>
+      <td><span class="pill ${totRow.status}">${fmtPct(totRow.dev, true)}</span></td>` : `
       <td>Totalt ${shown.length} konton</td>
       <td class="r num">${fmtMoney(tot.daily, cur)}</td>
       <td class="r num">${fmtMoney(tot.budget, cur)}</td>
@@ -1166,6 +1263,11 @@
   $('sort').addEventListener('change', (e) => { state.sort = e.target.value; render(); });
   $('refreshBtn').addEventListener('click', () => { load(true); });
   $('exportBtn').addEventListener('click', exportCsv);
+  document.querySelectorAll('[data-density]').forEach((b) => b.addEventListener('click', () => {
+    state.density = b.dataset.density;
+    try { localStorage.setItem('pacing-density', state.density); } catch {}
+    render();
+  }));
   $('dormantChip').addEventListener('click', () => { state.showDormant = !state.showDormant; render(); });
   $('bellBtn').addEventListener('click', () => openDrawer('alerts'));
   $('manageBtn').addEventListener('click', () => openDrawer('manage'));
@@ -1230,7 +1332,14 @@
       return;
     }
     const r = e.target.closest('[data-reset]');
-    if (r) saveBudget(r.dataset.reset, null);
+    if (r) { saveBudget(r.dataset.reset, null); return; }
+    // Kompakt läge: klick var som helst på raden fäller ut den.
+    const row = e.target.closest('tr[data-row]');
+    if (row && !e.target.closest('input, button, a, label')) {
+      const id = row.dataset.row;
+      state.open.has(id) ? state.open.delete(id) : state.open.add(id);
+      render();
+    }
   });
   $('tbody').addEventListener('change', (e) => {
     const input = e.target.closest('[data-budget]');
