@@ -1,11 +1,14 @@
 const express = require('express');
-const fs = require('fs');
 const path = require('path');
 
+const store = require('./store');
+const { monthInfo } = require('./pacing');
+const alerts = require('./alerts');
+
 const PORT = process.env.PORT || 3000;
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
-const BUDGETS_FILE = path.join(DATA_DIR, 'budgets.json');
 const CACHE_MS = Number(process.env.CACHE_MINUTES || 5) * 60 * 1000;
+const REFRESH_MS = Number(process.env.REFRESH_MINUTES || 30) * 60 * 1000; // bakgrundskontroll för larm
+const CONCURRENCY = Number(process.env.GOOGLE_ADS_CONCURRENCY || 6);
 
 // Mockläge tills alla Google Ads-uppgifter finns (eller om MOCK=1 sätts).
 const REQUIRED = [
@@ -17,82 +20,129 @@ const REQUIRED = [
 ];
 const MOCK = process.env.MOCK === '1' || REQUIRED.some((k) => !process.env[k]);
 
-const clients = require('./clients.json');
+// clients.json är valfri: namn och standardbudget per konto-ID.
+// I liveläge hämtas kontolistan från MCC:n; konton i clients.json läggs till om de saknas där.
+const overrides = require('./clients.json');
 const googleAds = MOCK ? null : require('./googleAds');
 
-// ---------- Manuella månadsbudgetar ----------
-fs.mkdirSync(DATA_DIR, { recursive: true });
-function readBudgets() {
-  try { return JSON.parse(fs.readFileSync(BUDGETS_FILE, 'utf8')); } catch { return {}; }
-}
-function writeBudgets(b) {
-  const tmp = BUDGETS_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(b, null, 2));
-  fs.renameSync(tmp, BUDGETS_FILE);
-}
-// Budgetar lagras per månad ("2026-09"), så en ny månad börjar på auto
-// om ingen budget lagts in, medan clients.json kan ange en standardbudget.
-function monthKey() {
-  const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Stockholm', year: 'numeric', month: '2-digit' }).format(new Date());
-  return p.slice(0, 7);
-}
-// Ordning: ändrad budget för aktuell månad → standardbudget i clients.json → null (auto).
+// ---------- Budgetar och dolda konton ----------
 function budgetFor(accountId) {
-  const m = readBudgets()[monthKey()] || {};
-  const c = clients.find((x) => x.id === accountId);
+  const m = store.get().budgets[monthInfo().key] || {};
+  const c = overrides.find((x) => x.id === accountId);
   const def = c && c.defaultMonthlyBudget != null ? c.defaultMonthlyBudget : null;
   if (m[accountId] != null) return { monthlyBudget: m[accountId], budgetSource: 'manual', defaultMonthlyBudget: def };
   if (def != null) return { monthlyBudget: def, budgetSource: 'default', defaultMonthlyBudget: def };
   return { monthlyBudget: null, budgetSource: null, defaultMonthlyBudget: null };
 }
+const isHidden = (id) => store.get().hidden.includes(id);
+const withState = (a) => ({ ...a, ...budgetFor(a.id), hidden: isHidden(a.id) });
 
 // ---------- Mockdata ----------
-function mockAccount(c, i) {
-  const now = new Date();
-  const day = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Stockholm', day: 'numeric' }).format(now));
-  const daily = [110, 300, 135, 220, 80][i % 5];
-  const pace = [1.0, 1.12, 0.58, 0.93, 1.3][i % 5];
-  const cost = Math.round(daily * pace * Math.max(0.5, day - 0.5) * 100) / 100;
-  return {
-    currency: 'SEK',
-    dailyBudget: daily,
-    mtdCost: cost,
-    campaigns: [
-      { id: `${c.id}-1`, name: 'Sök | Varumärke', status: 'ENABLED', dailyBudget: Math.round(daily * 0.35), budgetShared: false, cost: Math.round(cost * 0.3) },
-      { id: `${c.id}-2`, name: 'Sök | Tjänster', status: 'ENABLED', dailyBudget: Math.round(daily * 0.65), budgetShared: false, cost: Math.round(cost * 0.7) },
-    ],
-  };
+const MOCK_EXTRA = [
+  ['1112223334', 'Testkund Bygg & Fasad AB', 250, 1.35],
+  ['2223334445', 'Testkund Tandvård Syd', 90, 1.02],
+  ['3334445556', 'Testkund Elektronik Online', 600, 0.78],
+  ['4445556667', 'Testkund Advokatbyrå', 140, 1.09],
+  ['5556667778', 'Testkund Gym & Hälsa', 70, 0, 'stopped'],
+  ['6667778889', 'Testkund Vilande konto', 0, 0],
+  ['7778889990', 'Testkund Bilverkstad', 110, 0.97, 'error'],
+];
+function mockAccounts() {
+  const base = overrides.map((c, i) => [c.id, c.name, [110, 300, 135][i % 3], [1.0, 1.12, 0.58][i % 3]]);
+  return [...base, ...MOCK_EXTRA].map(([id, name, daily, pace, flag]) => ({ id, name, daily, pace, flag }));
+}
+function mockData(acc) {
+  if (acc.flag === 'error') throw new Error('USER_PERMISSION_DENIED (testdata)');
+  const m = monthInfo();
+  const dailyCost = {};
+  let mtdCost = 0;
+  const pad = (x) => String(x).padStart(2, '0');
+  for (let d = 1; d <= m.day; d++) {
+    const share = d === m.day ? (m.hour + m.minute / 60) / 24 : 1;
+    let cost = acc.daily * acc.pace * share * (0.85 + ((d * 7 + acc.id.charCodeAt(0)) % 30) / 100);
+    if (acc.flag === 'stopped') cost = d < m.day - 1 ? acc.daily * 0.95 : 0;
+    cost = Math.round(cost * 100) / 100;
+    if (cost > 0) dailyCost[`${m.key}-${pad(d)}`] = cost;
+    mtdCost += cost;
+  }
+  mtdCost = Math.round(mtdCost * 100) / 100;
+  const campaigns = acc.daily > 0 ? [
+    { id: `${acc.id}-1`, name: 'Sök | Varumärke', status: 'ENABLED', dailyBudget: Math.round(acc.daily * 0.35), budgetShared: false, cost: Math.round(mtdCost * 0.3) },
+    { id: `${acc.id}-2`, name: 'Sök | Tjänster', status: 'ENABLED', dailyBudget: Math.round(acc.daily * 0.65), budgetShared: false, cost: Math.round(mtdCost * 0.7) },
+  ] : [];
+  return { currency: 'SEK', dailyBudget: acc.daily, mtdCost, dailyCost, campaigns };
 }
 
-// ---------- Hämtning med cache ----------
-let cache = null; // { at, payload }
+// ---------- Hämtning ----------
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let i = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (i < items.length) {
+      const idx = i++;
+      out[idx] = await fn(items[idx], idx);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+async function listAccounts() {
+  if (MOCK) return mockAccounts();
+  const fromMcc = await googleAds.listClientAccounts();
+  const byId = new Map(fromMcc.map((a) => [a.id, a]));
+  for (const o of overrides) {
+    if (byId.has(o.id)) byId.get(o.id).name = o.name || byId.get(o.id).name;
+    else byId.set(o.id, { id: o.id, name: o.name });
+  }
+  return [...byId.values()];
+}
 
 async function buildPayload() {
-  const accounts = await Promise.all(clients.map(async (c, i) => {
-    const base = { id: c.id, name: c.name, ...budgetFor(c.id) };
+  const list = await listAccounts();
+  const accounts = await mapLimit(list, CONCURRENCY, async (acc) => {
+    const base = { id: acc.id, name: acc.name };
     try {
-      const data = MOCK ? mockAccount(c, i) : await googleAds.fetchAccount(c.id);
+      const data = MOCK ? mockData(acc) : await googleAds.fetchAccount(acc.id);
       return { ...base, ...data };
     } catch (err) {
-      console.error(`[${c.name}]`, err.message);
-      return { ...base, currency: 'SEK', dailyBudget: 0, mtdCost: 0, campaigns: [], error: `Kunde inte hämta: ${err.message}` };
+      console.error(`[${acc.name}]`, err.message);
+      return { ...base, currency: acc.currency || 'SEK', dailyBudget: 0, mtdCost: 0, dailyCost: {}, campaigns: [], error: `Kunde inte hämta: ${err.message}` };
     }
-  }));
+  });
+  accounts.sort((a, b) => a.name.localeCompare(b.name, 'sv'));
   return { mode: MOCK ? 'mock' : 'live', generatedAt: new Date().toISOString(), accounts };
+}
+
+let cache = null; // { at, payload }
+let inflight = null;
+
+async function checkAlerts(payload) {
+  const changed = alerts.evaluate(payload.accounts.map(withState), monthInfo(), store.get());
+  if (changed) await store.save().catch((e) => console.error('Kunde inte spara larm:', e.message));
 }
 
 async function getPayload(force) {
   if (!force && cache && Date.now() - cache.at < CACHE_MS) return cache.payload;
-  const payload = await buildPayload();
-  cache = { at: Date.now(), payload };
-  return payload;
+  if (!inflight) {
+    inflight = buildPayload()
+      .then(async (payload) => {
+        cache = { at: Date.now(), payload };
+        await checkAlerts(payload);
+        return payload;
+      })
+      .finally(() => { inflight = null; });
+  }
+  return inflight;
 }
+
+const knownId = (id) => (cache?.payload.accounts || []).some((a) => a.id === id) || overrides.some((c) => c.id === id);
 
 // ---------- App ----------
 const app = express();
 app.use(express.json());
 
-// Enkel inloggning. Sätt DASHBOARD_PASSWORD på Render, annars är sidan öppen.
+// Enkel inloggning. Sätt DASHBOARD_PASSWORD, annars är sidan öppen.
 if (process.env.DASHBOARD_PASSWORD) {
   const user = process.env.DASHBOARD_USER || 'mild';
   app.use((req, res, next) => {
@@ -107,37 +157,84 @@ if (process.env.DASHBOARD_PASSWORD) {
   });
 }
 
-app.get('/healthz', (req, res) => res.json({ ok: true, mode: MOCK ? 'mock' : 'live' }));
+app.get('/healthz', (req, res) => res.json({ ok: true, mode: MOCK ? 'mock' : 'live', store: store.kind }));
 
 app.get('/api/pacing', async (req, res) => {
   try {
     const payload = await getPayload(req.query.refresh === '1');
-    // Budgetar läses alltid färskt så ändringar syns direkt även om kontodata är cachad.
-    res.json({ ...payload, accounts: payload.accounts.map((a) => ({ ...a, ...budgetFor(a.id) })) });
+    // Budgetar och dolda konton läses alltid färskt, även när kontodata är cachad.
+    res.json({ ...payload, accounts: payload.accounts.map(withState) });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    res.status(502).json({ error: `Kunde inte hämta konton från Google Ads: ${err.message}` });
   }
 });
 
-app.put('/api/budgets/:id', (req, res) => {
+app.put('/api/budgets/:id', async (req, res) => {
   const id = req.params.id;
-  if (!clients.some((c) => c.id === id)) return res.status(404).json({ error: 'Okänt konto' });
+  if (!knownId(id)) return res.status(404).json({ error: 'Okänt konto' });
   const v = req.body?.monthlyBudget;
   if (v !== null && !(typeof v === 'number' && isFinite(v) && v >= 0)) {
     return res.status(400).json({ error: 'monthlyBudget måste vara ett tal ≥ 0 eller null' });
   }
-  const b = readBudgets();
-  const key = monthKey();
-  b[key] = b[key] || {};
-  if (v === null) delete b[key][id]; // återställ till standard/auto
-  else b[key][id] = v;
-  writeBudgets(b);
+  const s = store.get();
+  const key = monthInfo().key;
+  s.budgets[key] = s.budgets[key] || {};
+  if (v === null) delete s.budgets[key][id]; // återställ till standard/auto
+  else s.budgets[key][id] = v;
+  try {
+    await store.save();
+  } catch (err) {
+    console.error('Kunde inte spara budget:', err.message);
+    return res.status(500).json({ error: 'Budgeten kunde inte sparas' });
+  }
+  if (cache) await checkAlerts(cache.payload);
   res.json({ id, month: key, ...budgetFor(id) });
+});
+
+// Visa eller dölj ett eller flera konton: { ids: [...], hidden: true|false }
+app.put('/api/accounts', async (req, res) => {
+  const ids = req.body?.ids;
+  const hidden = req.body?.hidden;
+  if (!Array.isArray(ids) || !ids.length || typeof hidden !== 'boolean') {
+    return res.status(400).json({ error: 'Ange ids (lista med konto-ID) och hidden (true eller false)' });
+  }
+  const unknown = ids.filter((id) => !knownId(String(id)));
+  if (unknown.length) return res.status(404).json({ error: `Okända konton: ${unknown.join(', ')}` });
+  const s = store.get();
+  const set = new Set(s.hidden);
+  ids.forEach((id) => (hidden ? set.add(String(id)) : set.delete(String(id))));
+  s.hidden = [...set];
+  try {
+    await store.save();
+  } catch (err) {
+    console.error('Kunde inte spara kontoval:', err.message);
+    return res.status(500).json({ error: 'Ändringen kunde inte sparas' });
+  }
+  if (cache) await checkAlerts(cache.payload);
+  res.json({ ids, hidden });
+});
+
+app.get('/api/alerts', (req, res) => {
+  const all = [...store.get().alerts].sort((a, b) => Date.parse(b.openedAt) - Date.parse(a.openedAt));
+  res.json({
+    minDay: alerts.MIN_DAY,
+    refreshMinutes: REFRESH_MS / 60000,
+    active: all.filter((x) => !x.resolvedAt),
+    history: all.filter((x) => x.resolvedAt).sort((a, b) => Date.parse(b.resolvedAt) - Date.parse(a.resolvedAt)),
+  });
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.listen(PORT, () => {
-  console.log(`Budget pacing kör på http://localhost:${PORT} (${MOCK ? 'mockläge' : 'Google Ads ' + googleAds.API_VERSION})`);
-});
+store.load()
+  .catch((err) => console.error('Kunde inte läsa sparat tillstånd, startar tomt:', err.message))
+  .finally(() => {
+    app.listen(PORT, () => {
+      console.log(`Budget pacing kör på http://localhost:${PORT} (${MOCK ? 'mockläge' : 'Google Ads ' + googleAds.API_VERSION}, lagring: ${store.kind})`);
+    });
+    // Bakgrundskontroll så att larm uppdateras även när ingen har sidan öppen.
+    const tick = () => getPayload(true).catch((e) => console.error('Bakgrundskontroll misslyckades:', e.message));
+    setTimeout(tick, 5000);
+    setInterval(tick, REFRESH_MS);
+  });

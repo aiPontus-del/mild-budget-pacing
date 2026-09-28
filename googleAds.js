@@ -70,16 +70,30 @@ const BUDGET_QUERY = `
   FROM campaign
   WHERE campaign.status IN ('ENABLED', 'PAUSED')`;
 
-// Kostnad per kampanj hittills i månaden (Google räknar i kontots tidszon).
+// Kostnad per kampanj och dag hittills i månaden (Google räknar i kontots tidszon).
 const COST_QUERY = `
   SELECT
     campaign.id,
     campaign.name,
     campaign.status,
+    segments.date,
     metrics.cost_micros
   FROM campaign
   WHERE segments.date DURING THIS_MONTH
     AND metrics.cost_micros > 0`;
+
+// Alla vanliga annonskonton (inte underkonton som själva är MCC) under inloggnings-MCC:n.
+const CLIENTS_QUERY = `
+  SELECT
+    customer_client.id,
+    customer_client.descriptive_name,
+    customer_client.currency_code,
+    customer_client.status,
+    customer_client.manager,
+    customer_client.level
+  FROM customer_client
+  WHERE customer_client.manager = false
+    AND customer_client.status = 'ENABLED'`;
 
 const micros = (v) => (v == null ? 0 : Number(v) / 1_000_000);
 
@@ -113,9 +127,12 @@ async function fetchAccount(customerId) {
   }
 
   let mtdCost = 0;
+  const byDate = {};
   for (const r of costRows) {
     const cost = micros(r.metrics?.costMicros);
     mtdCost += cost;
+    const d = r.segments?.date;
+    if (d) byDate[d] = (byDate[d] || 0) + cost;
     const c = campaigns.get(r.campaign.id);
     if (c) c.cost += cost;
     else campaigns.set(r.campaign.id, { id: r.campaign.id, name: r.campaign.name, status: r.campaign.status, dailyBudget: null, budgetShared: false, cost });
@@ -124,7 +141,17 @@ async function fetchAccount(customerId) {
   // Visa bara kampanjer som är aktiva eller har spenderat i månaden.
   const list = [...campaigns.values()].filter((c) => c.status === 'ENABLED' || c.cost > 0);
 
-  return { currency: currency || 'SEK', dailyBudget, mtdCost, campaigns: list };
+  return { currency: currency || 'SEK', dailyBudget, mtdCost, dailyCost: byDate, campaigns: list };
 }
 
-module.exports = { fetchAccount, API_VERSION };
+async function listClientAccounts() {
+  const mcc = env('GOOGLE_ADS_LOGIN_CUSTOMER_ID').replace(/-/g, '');
+  const rows = await search(mcc, CLIENTS_QUERY);
+  const seen = new Set();
+  return rows
+    .map((r) => r.customerClient)
+    .filter((c) => c && !seen.has(String(c.id)) && seen.add(String(c.id)))
+    .map((c) => ({ id: String(c.id), name: c.descriptiveName || String(c.id), currency: c.currencyCode }));
+}
+
+module.exports = { fetchAccount, listClientAccounts, API_VERSION };

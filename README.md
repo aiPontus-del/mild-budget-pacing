@@ -5,7 +5,9 @@ Budget pacing för Milds Google Ads-konton, direkt mot Google Ads API. Ingen Sup
 - `public/index.html` – dashboarden (en fil, inga byggsteg)
 - `server.js` – Express-server: `/api/pacing`, `/api/budgets/:id`, lösenordsskydd, cache
 - `googleAds.js` – hämtar budgetar och kostnad via Google Ads API (REST, GAQL)
-- `clients.json` – vilka konton som visas, med standardbudget per månad
+- `clients.json` – valfria namn och standardbudgetar per konto-ID (kontolistan hämtas från MCC:n)
+- `alerts.js` – larmregler för notiscentret
+- `store.js` – lagring av budgetar, dolda konton och larm (fil eller Redis)
 - `render.yaml` – färdig uppsättning för Render
 
 ## Köra lokalt
@@ -46,17 +48,38 @@ Viktigt: står OAuth-samtyckesskärmen i läget **Testing** slutar refresh token
 2. Render → New → Blueprint → välj repot. `render.yaml` sätter upp tjänst, disk och variabler.
 3. Fyll i hemliga variabler, inklusive `DASHBOARD_PASSWORD`.
 
-Manuella månadsbudgetar sparas i `DATA_DIR/budgets.json`, per månad. På Renders gratisplan finns ingen disk, så de nollställs vid omstart. Därför pekar `render.yaml` på Starter med 1 GB disk. Standardbudgetar i `clients.json` gäller alltid som reserv.
+### Var månadsbudgetarna sparas
 
-## Lägga till konton
+Ändrade månadsbudgetar (per månad), dolda konton och larm sparas tillsammans.
 
-Lägg till en rad i `clients.json`:
+- **Med `REDIS_URL` satt** (rekommenderas): i Redis, t.ex. Upstash gratisnivå. Överlever omstarter och fungerar på Renders gratisplan. Nyckeln är `mild-budget-pacing:state` (ändras med `REDIS_KEY`).
+- **Utan `REDIS_URL`**: i `DATA_DIR/state.json`. På Renders gratisplan nollställs filen varje gång tjänsten startar om eller somnar, så då behövs Starter-plan med disk.
+
+`/healthz` visar vilken lagring som används (`store`). Standardbudgetar i `clients.json` gäller alltid som reserv.
+
+## Konton
+
+I liveläge hämtas alla aktiva annonskonton under MCC:n automatiskt (underkonton som själva är MCC tas inte med). Konton döljs eller visas under **Hantera konton** i dashboarden, och valet sparas på servern. Konton utan dagsbudget och utan kostnad i månaden räknas som vilande och visas bara när **Visa vilande** är vald.
+
+`clients.json` behövs inte längre för att få med konton, men kan ge ett konto ett annat namn eller en standardbudget:
 
 ```json
 { "id": "1234567890", "name": "Kundnamn", "defaultMonthlyBudget": 10000 }
 ```
 
-Utan `defaultMonthlyBudget` används aktiv dagsbudget × 30,4.
+## Notiscenter
+
+Servern kontrollerar alla synliga konton varje gång data hämtas och i bakgrunden var 30:e minut (`REFRESH_MINUTES`). Larmen:
+
+| Larm | När | Nivå |
+|---|---|---|
+| Månadsbudgeten är slut | Spend hittills ≥ budget och månaden är inte slut | Kritisk |
+| Över budget | Prognos mer än 15 % över budget, från dag 4 (`ALERT_MIN_DAY`) | Kritisk |
+| Ingen kostnad i går | Aktiv dagsbudget men 0 kr i går | Kritisk |
+| Under budget | Prognos mer än 15 % under budget, från dag 4 | Varning |
+| Data kunde inte hämtas | Google Ads-anropet för kontot misslyckades | Varning |
+
+Ett larm är aktivt så länge villkoret gäller och flyttas till historiken när det slutar gälla eller kontot döljs. Historiken sparas i 90 dagar (`ALERT_HISTORY_DAYS`).
 
 ## Så räknas det
 

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Mild Budget Pacing</title>
+<script>try{var t=localStorage.getItem("pacing-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -82,6 +83,7 @@
   }
 
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body {
     margin: 0;
     background: var(--bg);
@@ -354,6 +356,95 @@
   }
   .toast.show { opacity: 1; transform: none; }
 
+  /* Notiser och kontohantering */
+  .btn-bell { position: relative; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-bell .bell-count {
+    min-width: 18px; height: 18px; padding: 0 5px;
+    display: inline-grid; place-items: center;
+    border-radius: 999px;
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    background: var(--surface-2); color: var(--ink-2);
+  }
+  .btn-bell.has-critical .bell-count { background: var(--over); color: #fff; }
+  .btn-bell.has-new::after {
+    content: ""; position: absolute; top: -3px; right: -3px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--over); box-shadow: 0 0 0 2px var(--bg);
+  }
+  .banner {
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: var(--over-soft); color: var(--over);
+    font-weight: 600; font-size: 13px;
+  }
+  .row-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+  .row-tag {
+    display: inline-flex; align-items: center;
+    padding: 1px 7px; border-radius: 4px;
+    font-size: 10.5px; font-weight: 600;
+    background: var(--over-soft); color: var(--over);
+    white-space: nowrap;
+  }
+  .row-tag.warning { background: var(--warn-soft); color: var(--warn); }
+  .chip.toggle[aria-pressed="true"] { background: var(--surface-2); color: var(--ink); border-color: var(--line-2); }
+
+  .scrim { position: fixed; inset: 0; background: rgba(10, 18, 16, .38); z-index: 40; }
+  .drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: min(460px, 100%);
+    display: flex; flex-direction: column;
+    background: var(--surface);
+    border-left: 1px solid var(--line);
+    box-shadow: -12px 0 32px -12px rgba(0, 0, 0, .25);
+    z-index: 50;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .drawer-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  .drawer-head h2 { margin: 0; font-size: 16px; font-weight: 700; }
+  .drawer-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+  .drawer-body { flex: 1; overflow-y: auto; }
+  .drawer-note { padding: 12px 18px; font-size: 12px; color: var(--ink-3); border-bottom: 1px solid var(--line); }
+  .tabs { display: flex; gap: 6px; }
+  .alert-item {
+    display: grid; grid-template-columns: 10px 1fr; gap: 10px;
+    width: 100%;
+    padding: 12px 18px;
+    border: 0; border-bottom: 1px solid var(--line);
+    background: none; text-align: left; cursor: pointer;
+  }
+  .alert-item:hover { background: var(--surface-2); }
+  .alert-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .alert-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--warn); }
+  .alert-item.critical .alert-dot { background: var(--over); }
+  .alert-item.resolved .alert-dot { background: var(--line-2); }
+  .alert-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+  .alert-acct { font-weight: 600; }
+  .alert-time { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+  .alert-title, .alert-detail, .alert-resolved { display: block; }
+  .alert-title { margin-top: 2px; font-size: 12.5px; font-weight: 600; color: var(--over); }
+  .alert-item.warning .alert-title { color: var(--warn); }
+  .alert-item.resolved .alert-title { color: var(--ink-2); }
+  .alert-detail { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+  .alert-resolved { font-size: 11px; color: var(--ok); margin-top: 3px; }
+  .manage-row {
+    display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+  }
+  .manage-row:hover { background: var(--surface-2); }
+  .manage-row input { width: 16px; height: 16px; accent-color: var(--accent); }
+  .manage-name { font-weight: 600; font-size: 13px; }
+  .manage-sub { display: block; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .manage-spend { font-family: var(--mono); font-size: 12px; color: var(--ink-2); text-align: right; }
+  .manage-row.is-hidden .manage-name { color: var(--ink-3); }
+  .drawer .empty { padding: 28px 18px; }
+
   @media (max-width: 1000px) {
     .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .notes { grid-template-columns: 1fr; }
@@ -382,10 +473,14 @@
     <div class="top-actions">
       <span class="source" id="source">Hämtar…</span>
       <span class="updated" id="updated"></span>
+      <button class="btn btn-bell" id="bellBtn" type="button" aria-haspopup="dialog">Notiser <span class="bell-count" id="bellCount">0</span></button>
+      <button class="btn" id="themeBtn" type="button" aria-label="Byt mellan ljust och mörkt läge">Mörkt läge</button>
       <button class="btn" id="exportBtn" type="button">Exportera CSV</button>
       <button class="btn" id="refreshBtn" type="button">Uppdatera</button>
     </div>
   </header>
+
+  <div class="banner" id="banner" role="alert" hidden></div>
 
   <section class="month" aria-label="Månadens förlopp">
     <div>
@@ -430,13 +525,16 @@
           <button class="chip" type="button" data-filter="attention" aria-pressed="false">Behöver åtgärd<span class="count" id="cAtt">0</span></button>
           <button class="chip" type="button" data-filter="over" aria-pressed="false">Över<span class="count" id="cOver">0</span></button>
           <button class="chip" type="button" data-filter="under" aria-pressed="false">Under<span class="count" id="cUnder">0</span></button>
+          <button class="chip toggle" type="button" id="dormantChip" aria-pressed="false" title="Konton utan dagsbudget och utan kostnad i månaden">Visa vilande<span class="count" id="cDormant">0</span></button>
         </div>
         <input class="search" id="search" type="search" placeholder="Sök kund eller konto-ID" aria-label="Sök kund eller konto-ID">
         <select id="sort" aria-label="Sortera">
+          <option value="status">Status: över, under, i fas</option>
           <option value="dev">Störst avvikelse först</option>
           <option value="name">Namn A–Ö</option>
           <option value="spend">Mest spend först</option>
         </select>
+        <button class="btn" id="manageBtn" type="button" aria-haspopup="dialog">Hantera konton</button>
       </div>
     </div>
     <div class="table-wrap">
@@ -482,6 +580,16 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" hidden>
+  <div class="drawer-head">
+    <h2 id="drawerTitle">Notiser</h2>
+    <button class="btn" id="drawerClose" type="button">Stäng</button>
+  </div>
+  <div id="drawerTools"></div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
 <script>
 (() => {
   'use strict';
@@ -497,8 +605,14 @@
     generatedAt: null,
     filter: 'all',
     search: '',
-    sort: 'dev',
+    sort: 'status',
+    showDormant: false,
     open: new Set(),
+    alerts: { active: [], history: [], minDay: 4 },
+    drawer: null,        // 'alerts' | 'manage'
+    alertTab: 'active',
+    manageSearch: '',
+    error: null,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -608,11 +722,19 @@
     btn.disabled = true;
     try {
       const res = await fetch(`${API}/pacing${force ? '?refresh=1' : ''}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
       const ct = res.headers.get('content-type') || '';
       if (!ct.includes('application/json')) throw new Error('Inget API');
       const data = await res.json();
+      if (!res.ok) {
+        // Servern svarade men kunde inte hämta från Google Ads: visa felet, inte exempeldata.
+        state.error = data.error || `Servern svarade ${res.status}.`;
+        if (state.mode === null) state.mode = 'live';
+        render();
+        return;
+      }
+      state.error = null;
       apply(data);
+      loadAlerts();
     } catch (err) {
       if (state.mode === null || state.mode === 'demo') {
         apply(demoPayload());
@@ -628,6 +750,43 @@
     state.generatedAt = data.generatedAt;
     state.accounts = data.accounts || [];
     render();
+  }
+
+  async function loadAlerts() {
+    if (state.mode === 'demo') return;
+    try {
+      const res = await fetch(`${API}/alerts`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      state.alerts = await res.json();
+      renderBell();
+      if (state.drawer) renderDrawer();
+      render();
+    } catch { /* notiser är inte kritiska */ }
+  }
+
+  async function setHidden(ids, hidden) {
+    const accts = state.accounts.filter((a) => ids.includes(a.id));
+    if (!accts.length) return;
+    const prev = accts.map((a) => [a, a.hidden]);
+    accts.forEach((a) => { a.hidden = hidden; });
+    render();
+    renderDrawer();
+    if (state.mode === 'demo') return;
+    try {
+      const res = await fetch(`${API}/accounts`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, hidden }),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      toast(ids.length === 1 ? `${accts[0].name} ${hidden ? 'döljs' : 'visas'}` : `${ids.length} konton ${hidden ? 'döljs' : 'visas'}`);
+      loadAlerts();
+    } catch {
+      prev.forEach(([a, h]) => { a.hidden = h; });
+      render();
+      renderDrawer();
+      toast('Ändringen sparades inte. Kontrollera anslutningen och försök igen.');
+    }
   }
 
   async function saveBudget(id, value) {
@@ -654,6 +813,7 @@
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       toast(value == null ? `${acct.name}: budget återställd` : `Budget för ${acct.name} sparad: ${fmtMoney(value, acct.currency)}`);
+      loadAlerts();
     } catch {
       Object.assign(acct, prev);
       render();
@@ -686,6 +846,8 @@
       $('updated').textContent = `Hämtad ${t}`;
     }
     $('exportBtn').hidden = state.mode === 'demo';
+    $('manageBtn').hidden = false;
+    renderBell();
   }
 
   function barHtml(r, elapsedPct, color) {
@@ -707,16 +869,30 @@
     renderMonth(m);
     renderSource();
 
-    const rows = state.accounts.map((a) => derive(a, m));
+    const banner = $('banner');
+    banner.hidden = !state.error;
+    banner.textContent = state.error || '';
+
+    const rows = state.accounts.filter((a) => !a.hidden).map((a) => derive(a, m));
+    const isDormant = (r) => !r.error && !(r.dailyBudget > 0) && !(r.mtdCost > 0);
+    const dormantCount = rows.filter(isDormant).length;
+    const shown = rows.filter((r) => state.showDormant || !isDormant(r));
+    const alertsByAcct = new Map();
+    (state.alerts.active || []).forEach((x) => {
+      if (!alertsByAcct.has(x.accountId)) alertsByAcct.set(x.accountId, []);
+      alertsByAcct.get(x.accountId).push(x);
+    });
     const currencies = new Set(rows.map((r) => r.currency || 'SEK'));
     const cur = currencies.size === 1 ? [...currencies][0] : 'SEK';
 
     // Counts
     const isAtt = (r) => r.status === 'over' || r.status === 'under' || r.status === 'warn' || r.error;
-    $('cAll').textContent = rows.length;
-    $('cAtt').textContent = rows.filter(isAtt).length;
-    $('cOver').textContent = rows.filter((r) => r.dev > 5).length;
-    $('cUnder').textContent = rows.filter((r) => r.dev < -5).length;
+    $('cAll').textContent = shown.length;
+    $('cAtt').textContent = shown.filter(isAtt).length;
+    $('cOver').textContent = shown.filter((r) => r.dev > 5).length;
+    $('cUnder').textContent = shown.filter((r) => r.dev < -5).length;
+    $('cDormant').textContent = dormantCount;
+    $('dormantChip').setAttribute('aria-pressed', String(state.showDormant));
 
     // Totals (over all accounts, not the filtered set)
     const tot = rows.reduce((t, r) => ({
@@ -735,7 +911,8 @@
 
     $('kBudget').textContent = fmtMoney(tot.budget, cur);
     const autoCount = rows.filter((r) => r.source === 'auto').length;
-    $('kBudgetSub').textContent = `${rows.length} konton · ${autoCount ? autoCount + ' räknade från dagsbudget' : 'alla med satt budget'}`;
+    const hiddenCount = state.accounts.length - rows.length;
+    $('kBudgetSub').textContent = `${shown.length} konton · ${autoCount ? autoCount + ' räknade från dagsbudget' : 'alla med satt budget'}${hiddenCount ? ` · ${hiddenCount} dolda` : ''}`;
     $('kMtd').textContent = fmtMoney(tot.mtd, cur);
     $('kMtdSub').textContent = `${fmtPct(totRow.util)} av budget · ${fmtPct(elapsedPct)} av tiden`;
     $('kFc').textContent = fmtMoney(tot.fc, cur);
@@ -749,14 +926,25 @@
 
     // Filter + sort
     const q = state.search.trim().toLowerCase();
-    let list = rows.filter((r) => {
+    let list = shown.filter((r) => {
       if (state.filter === 'attention' && !isAtt(r)) return false;
       if (state.filter === 'over' && !(r.dev > 5)) return false;
       if (state.filter === 'under' && !(r.dev < -5)) return false;
       if (q && !(r.name.toLowerCase().includes(q) || r.id.includes(q.replace(/-/g, '')))) return false;
       return true;
     });
+    // Över budget överst, sedan fel, risk för över, under, risk för under, i fas och sist utan budget.
+    const rank = (r) => {
+      if (r.status === 'over' || (r.budget > 0 && r.mtdCost >= r.budget)) return 0;
+      if (r.error) return 1;
+      if (r.status === 'warn' && r.dev > 0) return 2;
+      if (r.status === 'under') return 3;
+      if (r.status === 'warn') return 4;
+      if (r.status === 'ok') return 5;
+      return 6;
+    };
     list.sort((a, b) => {
+      if (state.sort === 'status') return rank(a) - rank(b) || Math.abs(b.dev ?? 0) - Math.abs(a.dev ?? 0) || a.name.localeCompare(b.name, 'sv');
       if (state.sort === 'name') return a.name.localeCompare(b.name, 'sv');
       if (state.sort === 'spend') return (b.mtdCost || 0) - (a.mtdCost || 0);
       return Math.abs(b.dev ?? -1) - Math.abs(a.dev ?? -1);
@@ -764,7 +952,7 @@
 
     const tbody = $('tbody');
     if (!list.length) {
-      tbody.innerHTML = `<tr><td colspan="8" class="empty">${rows.length ? 'Inga konton matchar filtret.' : 'Inga konton är konfigurerade ännu. Lägg till dem i clients.json på servern.'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="empty">${state.error ? 'Ingen kontodata att visa.' : rows.length ? 'Inga konton matchar filtret.' : 'Inga konton att visa. Öppna Hantera konton för att visa dolda konton.'}</td></tr>`;
     } else {
       tbody.innerHTML = list.map((r) => {
         const open = state.open.has(r.id);
@@ -779,6 +967,8 @@
                   <span class="acct-name">${esc(r.name)}</span>
                   <span class="acct-id">${fmtId(r.id)}</span>
                   ${r.error ? `<span class="acct-err">${esc(r.error)}</span>` : ''}
+                  ${(alertsByAcct.get(r.id) || []).filter((x) => x.type === 'stopped' || x.type === 'exhausted').length
+                    ? `<span class="row-tags">${alertsByAcct.get(r.id).filter((x) => x.type === 'stopped' || x.type === 'exhausted').map((x) => `<span class="row-tag ${x.severity}">${esc(x.title)}</span>`).join('')}</span>` : ''}
                 </div>
               </div>
             </td>
@@ -830,7 +1020,7 @@
     }
 
     $('tfoot').innerHTML = `
-      <td>Totalt ${rows.length} konton</td>
+      <td>Totalt ${shown.length} konton</td>
       <td class="r num">${fmtMoney(tot.daily, cur)}</td>
       <td class="r num">${fmtMoney(tot.budget, cur)}</td>
       <td class="r num">${fmtMoney(tot.mtd, cur)}</td>
@@ -840,10 +1030,106 @@
       <td class="r num">${fmtMoney(tot.need, cur)}/dag</td>`;
   }
 
+  // ---------- Notiser ----------
+  const SEEN_KEY = 'pacing-alerts-seen';
+  const getSeen = () => { try { return Number(localStorage.getItem(SEEN_KEY)) || 0; } catch { return 0; } };
+  const setSeen = () => { try { localStorage.setItem(SEEN_KEY, String(Date.now())); } catch {} };
+  const TYPE_ORDER = { exhausted: 0, over: 1, stopped: 2, error: 3, under: 4 };
+  const fmtTime = (iso) => new Date(iso).toLocaleString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm' });
+
+  function renderBell() {
+    const active = state.alerts.active || [];
+    const btn = $('bellBtn');
+    $('bellCount').textContent = active.length;
+    btn.classList.toggle('has-critical', active.some((x) => x.severity === 'critical'));
+    btn.classList.toggle('has-new', active.some((x) => Date.parse(x.openedAt) > getSeen()));
+    btn.setAttribute('aria-label', `Notiser, ${active.length} aktiva`);
+    btn.hidden = state.mode === 'demo';
+  }
+
+  function alertItem(x) {
+    const resolved = !!x.resolvedAt;
+    return `
+      <button class="alert-item ${resolved ? 'resolved' : x.severity}" type="button" data-goto="${esc(x.accountId)}">
+        <span class="alert-dot"></span>
+        <span>
+          <span class="alert-top"><span class="alert-acct">${esc(x.accountName)}</span><span class="alert-time">${fmtTime(x.openedAt)}</span></span>
+          <span class="alert-title">${esc(x.title)}</span>
+          <span class="alert-detail">${esc(x.detail)}</span>
+          ${resolved ? `<span class="alert-resolved">Löst ${fmtTime(x.resolvedAt)} · ${esc(x.resolvedReason || '')}</span>` : ''}
+        </span>
+      </button>`;
+  }
+
+  function renderDrawer() {
+    const drawer = $('drawer');
+    const open = !!state.drawer;
+    drawer.hidden = !open;
+    $('scrim').hidden = !open;
+    if (!open) return;
+    const tools = $('drawerTools');
+    const body = $('drawerBody');
+
+    if (state.drawer === 'alerts') {
+      $('drawerTitle').textContent = 'Notiser';
+      const active = (state.alerts.active || []).slice().sort((a, b) =>
+        (a.severity === 'critical' ? 0 : 1) - (b.severity === 'critical' ? 0 : 1) || (TYPE_ORDER[a.type] ?? 9) - (TYPE_ORDER[b.type] ?? 9) || Date.parse(b.openedAt) - Date.parse(a.openedAt));
+      const history = state.alerts.history || [];
+      tools.className = 'drawer-tools';
+      tools.innerHTML = `
+        <div class="tabs" role="tablist">
+          <button class="chip" type="button" role="tab" data-tab="active" aria-pressed="${state.alertTab === 'active'}">Aktiva<span class="count">${active.length}</span></button>
+          <button class="chip" type="button" role="tab" data-tab="history" aria-pressed="${state.alertTab === 'history'}">Historik<span class="count">${history.length}</span></button>
+        </div>`;
+      const list = state.alertTab === 'active' ? active : history;
+      body.innerHTML = `
+        <div class="drawer-note">Kontrolleras varje gång data hämtas och i bakgrunden var ${state.alerts.refreshMinutes ?? 30}:e minut. Larm för över och under budget börjar dag ${state.alerts.minDay ?? 4} i månaden. Klicka på ett larm för att visa kontot.</div>
+        ${list.length ? list.map(alertItem).join('') : `<p class="empty">${state.alertTab === 'active' ? 'Inga aktiva larm. Alla konton pacar inom gränserna.' : 'Ingen historik ännu.'}</p>`}`;
+      return;
+    }
+
+    // Hantera konton
+    $('drawerTitle').textContent = 'Hantera konton';
+    const q = state.manageSearch.trim().toLowerCase();
+    const all = state.accounts.slice().sort((a, b) => a.name.localeCompare(b.name, 'sv'));
+    const isDormant = (a) => !a.error && !(a.dailyBudget > 0) && !(a.mtdCost > 0);
+    const list = all.filter((a) => !q || a.name.toLowerCase().includes(q) || a.id.includes(q.replace(/-/g, '')));
+    const hiddenCount = all.filter((a) => a.hidden).length;
+    const dormantVisible = all.filter((a) => !a.hidden && isDormant(a)).map((a) => a.id);
+    tools.className = 'drawer-tools';
+    const prevFocus = document.activeElement && document.activeElement.id === 'manageSearch';
+    tools.innerHTML = `
+      <input class="search" id="manageSearch" type="search" placeholder="Sök konto" aria-label="Sök konto" value="${esc(state.manageSearch)}">
+      <button class="btn" type="button" data-bulk="hide-dormant" ${dormantVisible.length ? '' : 'disabled'}>Dölj vilande (${dormantVisible.length})</button>
+      <button class="btn" type="button" data-bulk="show-all" ${hiddenCount ? '' : 'disabled'}>Visa alla (${hiddenCount} dolda)</button>`;
+    if (prevFocus) { const el = $('manageSearch'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+    body.innerHTML = `
+      <div class="drawer-note">Bocka ur konton som inte ska synas i listan. Valet sparas på servern och gäller alla. Dolda konton får inga larm.</div>
+      ${list.length ? list.map((a) => `
+        <label class="manage-row ${a.hidden ? 'is-hidden' : ''}">
+          <input type="checkbox" data-visible="${esc(a.id)}" ${a.hidden ? '' : 'checked'} aria-label="Visa ${esc(a.name)}">
+          <span><span class="manage-name">${esc(a.name)}</span><span class="manage-sub">${fmtId(a.id)}${isDormant(a) ? ' · vilande' : ''}</span></span>
+          <span class="manage-spend">${fmtMoney(a.mtdCost, a.currency || 'SEK')}</span>
+        </label>`).join('') : '<p class="empty">Inga konton matchar sökningen.</p>'}`;
+  }
+
+  function openDrawer(kind) {
+    state.drawer = kind;
+    if (kind === 'alerts') { setSeen(); renderBell(); }
+    renderDrawer();
+    $('drawerClose').focus();
+  }
+  function closeDrawer() {
+    const kind = state.drawer;
+    state.drawer = null;
+    renderDrawer();
+    (kind === 'alerts' ? $('bellBtn') : $('manageBtn')).focus();
+  }
+
   // ---------- CSV ----------
   function exportCsv() {
     const m = monthInfo();
-    const rows = state.accounts.map((a) => derive(a, m));
+    const rows = state.accounts.filter((a) => !a.hidden).map((a) => derive(a, m));
     const n = (x) => (x == null || !isFinite(x) ? '' : String(Math.round(x * 100) / 100).replace('.', ','));
     const lines = [['Kund', 'Konto-ID', 'Valuta', 'Aktiv dagsbudget', 'Månadsbudget', 'Budgetkälla', 'Spend hittills', 'Prognos', 'Avvikelse %', 'Status', 'Behövd dagsspend'].join(';')];
     rows.forEach((r) => lines.push([
@@ -870,8 +1156,8 @@
   }
 
   // ---------- Events ----------
-  document.querySelectorAll('.chip').forEach((chip) => chip.addEventListener('click', () => {
-    document.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', 'false'));
+  document.querySelectorAll('.chip[data-filter]').forEach((chip) => chip.addEventListener('click', () => {
+    document.querySelectorAll('.chip[data-filter]').forEach((c) => c.setAttribute('aria-pressed', 'false'));
     chip.setAttribute('aria-pressed', 'true');
     state.filter = chip.dataset.filter;
     render();
@@ -880,6 +1166,60 @@
   $('sort').addEventListener('change', (e) => { state.sort = e.target.value; render(); });
   $('refreshBtn').addEventListener('click', () => { load(true); });
   $('exportBtn').addEventListener('click', exportCsv);
+  $('dormantChip').addEventListener('click', () => { state.showDormant = !state.showDormant; render(); });
+  $('bellBtn').addEventListener('click', () => openDrawer('alerts'));
+  $('manageBtn').addEventListener('click', () => openDrawer('manage'));
+  $('drawerClose').addEventListener('click', closeDrawer);
+  $('scrim').addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.drawer) closeDrawer(); });
+  $('drawerTools').addEventListener('click', (e) => {
+    const tab = e.target.closest('[data-tab]');
+    if (tab) { state.alertTab = tab.dataset.tab; renderDrawer(); return; }
+    const bulk = e.target.closest('[data-bulk]');
+    if (!bulk) return;
+    const isDormant = (a) => !a.error && !(a.dailyBudget > 0) && !(a.mtdCost > 0);
+    if (bulk.dataset.bulk === 'hide-dormant') setHidden(state.accounts.filter((a) => !a.hidden && isDormant(a)).map((a) => a.id), true);
+    if (bulk.dataset.bulk === 'show-all') setHidden(state.accounts.filter((a) => a.hidden).map((a) => a.id), false);
+  });
+  $('drawerTools').addEventListener('input', (e) => {
+    if (e.target.id === 'manageSearch') { state.manageSearch = e.target.value; renderDrawer(); }
+  });
+  $('drawerBody').addEventListener('change', (e) => {
+    const cb = e.target.closest('[data-visible]');
+    if (cb) setHidden([cb.dataset.visible], !cb.checked);
+  });
+  $('drawerBody').addEventListener('click', (e) => {
+    const item = e.target.closest('[data-goto]');
+    if (!item) return;
+    const acct = state.accounts.find((a) => a.id === item.dataset.goto);
+    if (!acct) return;
+    state.drawer = null;
+    renderDrawer();
+    if (acct.hidden) { toast(`${acct.name} är dolt. Visa det under Hantera konton.`); return; }
+    state.search = acct.name;
+    $('search').value = acct.name;
+    document.querySelectorAll('.chip[data-filter]').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.filter === 'all')));
+    state.filter = 'all';
+    if (!acct.dailyBudget && !acct.mtdCost) state.showDormant = true;
+    state.open.add(acct.id);
+    render();
+    document.querySelector('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // ---------- Ljust / mörkt läge ----------
+  const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const effectiveTheme = () => document.documentElement.getAttribute('data-theme') || (darkQuery.matches ? 'dark' : 'light');
+  function syncThemeBtn() {
+    $('themeBtn').textContent = effectiveTheme() === 'dark' ? 'Ljust läge' : 'Mörkt läge';
+  }
+  $('themeBtn').addEventListener('click', () => {
+    const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('pacing-theme', next); } catch {}
+    syncThemeBtn();
+  });
+  darkQuery.addEventListener?.('change', syncThemeBtn);
+  syncThemeBtn();
 
   $('tbody').addEventListener('click', (e) => {
     const t = e.target.closest('[data-toggle]');
