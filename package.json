@@ -1,0 +1,17 @@
+{
+  "name": "mild-budget-pacing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Budget pacing för Milds Google Ads-konton, direkt mot Google Ads API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "MOCK=1 node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

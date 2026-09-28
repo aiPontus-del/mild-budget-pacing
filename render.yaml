@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: mild-budget-pacing
+    runtime: node
+    plan: starter            # Disk kräver betald plan. Free fungerar men manuella budgetar nollställs vid omstart.
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATA_DIR
+        value: /var/data
+      - key: GOOGLE_ADS_API_VERSION
+        value: v25
+      - key: DASHBOARD_USER
+        value: mild
+      - key: DASHBOARD_PASSWORD
+        sync: false
+      - key: GOOGLE_ADS_DEVELOPER_TOKEN
+        sync: false
+      - key: GOOGLE_ADS_CLIENT_ID
+        sync: false
+      - key: GOOGLE_ADS_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_ADS_REFRESH_TOKEN
+        sync: false
+      - key: GOOGLE_ADS_LOGIN_CUSTOMER_ID
+        sync: false
+    disk:
+      name: pacing-data
+      mountPath: /var/data
+      sizeGB: 1
