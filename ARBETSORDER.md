@@ -24,7 +24,7 @@ Sätt upp Mild Budget Pacing på Milds server så att den nås på en egen adres
 
 - Den här zip-filen med koden. Kräver Node.js 20 eller senare: `npm install` och `npm start`. Alla inställningar finns med förklaring i `.env.example`.
 - Inloggningsuppgifterna till Google Ads API tar du fram själv: developer token (API Center i MCC:n, kräver administratörsbehörighet), OAuth client ID och secret (Google Cloud-projekt med Google Ads API aktiverat), refresh token och MCC:ns kund-ID. Använd Milds befintliga developer token om det redan finns en. Skapa refresh token med ett konto som bara har läsbehörighet i MCC:n. Stegen står i README, och värdena motsvarar `GOOGLE_ADS_*` i `.env.example`.
-- Utan Google-uppgifterna kör appen med testdata, så den kan sättas upp innan de finns.
+- Uppgifterna läggs in som miljövariabler: `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_REFRESH_TOKEN` och `GOOGLE_ADS_LOGIN_CUSTOMER_ID` (bara siffror). Så länge någon av dem saknas kör appen med testdata, så den kan sättas upp innan de finns. När alla fem är satta och appen startats om svarar `/healthz` `"mode":"live"` och sidan visar "Live från Google Ads".
 
 ## Klart när
 
